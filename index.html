@@ -740,46 +740,46 @@
         }
 
         // 预处理图像
-        function preprocessImage(image) {
-            const tensor = tf.browser.fromPixels(image)
-                .resizeNearestNeighbor([400, 400])
-                .toFloat()
-                .div(255.0)
-                .expandDims(0);
+        // 预处理图像：统一使用 resizeBilinear（与编码端保持一致）
+function preprocessImage(image) {
+    const tensor = tf.browser.fromPixels(image)
+        .resizeBilinear([400, 400])   // 修正：与编码端统一为 Bilinear
+        .toFloat()
+        .div(255.0)
+        .expandDims(0);
+    return tensor;
+}
 
-            return tensor;
-        }
+// 处理解码数据
+function processDecodedData(decodedArray) {
+    const binaryArray = Array.from(decodedArray).map(val => val > 0.5 ? '1' : '0');
+    const binaryString = binaryArray.join('');
+    const fullBinaryString = binaryString.length >= 100 ?
+        binaryString.substring(0, 100) :
+        binaryString + '0'.repeat(100 - binaryString.length);
 
-        // 处理解码数据
-        function processDecodedData(decodedArray) {
-            const binaryArray = Array.from(decodedArray).map(val => val > 0.5 ? '1' : '0');
-            const binaryString = binaryArray.join('');
-            const fullBinaryString = binaryString.length >= 100 ?
-                binaryString.substring(0, 100) :
-                binaryString + '0'.repeat(100 - binaryString.length);
-            const first56Bits = fullBinaryString.substring(0, 56);
+    const first56Bits = fullBinaryString.substring(0, 56);
 
-            let decodedText = '';
-            for (let i = 0; i < 56; i += 8) {
-                const byte = first56Bits.substring(i, i + 8);
-                const charCode = parseInt(byte, 2);
-                if (charCode >= 32 && charCode <= 126) {
-                    decodedText += String.fromCharCode(charCode);
-                } else {
-                    decodedText += '?';
-                }
-            }
+    let decodedText = '';
+    for (let i = 0; i < 56; i += 8) {
+        const byte = first56Bits.substring(i, i + 8);
+        const charCode = parseInt(byte, 2);
 
-            document.getElementById('binaryData').textContent = fullBinaryString;
-            document.getElementById('first56Bits').textContent = first56Bits;
-            document.getElementById('decodedText').textContent = decodedText;
+        // 关键修正：遇到空字符(0) 或 填充空格(32) 都视为结束符
+        if (charCode === 0 || charCode === 32) break;
+        decodedText += String.fromCharCode(charCode);
+    }
 
-            // 根据解码结果查找匹配的文件
-            findMatchingFiles(decodedText);
+    // 再次清理尾部可能残留的空白字符（保险处理）
+    decodedText = decodedText.trimEnd();
 
-            document.getElementById('resultSection').style.display = 'block';
-        }
+    document.getElementById('binaryData').textContent = fullBinaryString;
+    document.getElementById('first56Bits').textContent = first56Bits;
+    document.getElementById('decodedText').textContent = decodedText;
 
+    findMatchingFiles(decodedText);
+    document.getElementById('resultSection').style.display = 'block';
+}
         // 查找匹配的文件
         async function findMatchingFiles(decodedText) {
             const matchedResult = document.getElementById('matchedResult');
